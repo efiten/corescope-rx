@@ -38,6 +38,18 @@ npm test         # node --test (meshpacket parsing)
 Web Bluetooth requires a secure context (HTTPS or `localhost`). For phone testing over LAN, serve
 via HTTPS (e.g. a dev tunnel) — Chrome blocks Web Bluetooth on plain HTTP origins.
 
+## Deploy
+
+Published at **https://rx.on8ar.eu** (HTTPS — required for Web Bluetooth). It's a static build
+served by nginx on the reverse proxy `root@94.130.105.135` from `/var/www/rx.on8ar.eu` (TLS via
+certbot). Content updates are one command:
+
+```bash
+npm run deploy   # build (uses .env.local) + scp dist/ to the proxy
+```
+
+No nginx/cert changes are needed for content updates — only `deploy.sh` re-uploads `dist/`.
+
 ## Status
 
 Scaffold + protocol core implemented and unit-tested. See `docs/plan.md` for remaining tasks
