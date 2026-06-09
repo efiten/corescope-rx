@@ -7,6 +7,7 @@ import { WebBluetoothTransport } from './transport.js';
 import { parseFrame, PUSH_CODE_LOG_RX_DATA } from './frames.js';
 import { parsePacket, deriveHeardKey, bytesToHex } from './meshpacket.js';
 import { requestSelfInfo } from './selfinfo.js';
+import { loadNodeNames, nameFor } from './names.js';
 import { Gps } from './gps.js';
 import { Queue } from './queue.js';
 import { Publisher } from './publisher.js';
@@ -36,14 +37,20 @@ function noteHeard(key, keylen, snr, rssi, src) {
   renderRecent();
 }
 
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function renderRecent() {
   const el = els('recent');
   if (!state.recent.length) { el.innerHTML = '<div class="muted">— nothing yet —</div>'; return; }
   el.innerHTML = state.recent.map((e) => {
     const snr = e.snr != null ? e.snr.toFixed(1) + ' dB' : 'no sig';
+    const name = nameFor(e.key, e.keylen);
+    const label = name ? esc(name) : '<span class="rk">' + e.key + '</span>';
     return '<div class="rr">' +
       '<span class="dot" style="background:' + snrColor(e.snr) + '"></span>' +
-      '<span class="rk">' + e.key + '</span>' +
+      '<span class="rname">' + label + '</span>' +
       '<span class="rsnr" style="color:' + snrColor(e.snr) + '">' + snr + '</span>' +
       '<span class="rc">×' + e.count + '</span></div>';
   }).join('');
@@ -146,6 +153,9 @@ async function connectAll() {
     s2.className = '';
     els('companionInfo').textContent = state.companionPubkey.slice(0, 20) + '…';
     dbg('SELF_INFO → ' + (info.name || '(unnamed)') + ' ' + state.companionPubkey);
+
+    // Load node names (via corsproxy) in the background; re-render the list when ready.
+    loadNodeNames().then(() => { dbg('node names loaded'); renderRecent(); }).catch((e) => dbg('names unavailable: ' + e.message));
 
     state.gps.start();
 
