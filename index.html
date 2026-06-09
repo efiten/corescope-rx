@@ -28,7 +28,13 @@
     .row button { flex: 1; }
     label.inline { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 13px; color: #e6e6e6; }
     label.inline input { width: auto; }
-    #log { background: #0a0c10; border: 1px solid #2a2f3a; border-radius: 6px; padding: 8px; font: 11px/1.4 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; color: #9fe6b8; }
+    #log { background: #0a0c10; border: 1px solid #2a2f3a; border-radius: 6px; padding: 8px; font: 11px/1.4 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; color: #9fe6b8; margin-top: 8px; }
+    .recent { display: flex; flex-direction: column; gap: 4px; }
+    .rr { display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: #11141a; border: 1px solid #2a2f3a; border-radius: 6px; font-size: 13px; }
+    .rr .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+    .rr .rk { font-family: ui-monospace, monospace; }
+    .rr .rsnr { margin-left: auto; font-weight: 600; }
+    .rr .rc { color: #9aa4b2; font-size: 11px; min-width: 34px; text-align: right; }
   </style>
 </head>
 <body>
@@ -47,9 +53,13 @@
     <div class="muted" id="status"></div>
   </div>
   <div class="card">
-    <button id="btnClear" class="btn2">Clear log</button>
-    <label>Debug log (frames in, parsed result, outgoing payload)</label>
-    <pre id="log"></pre>
+    <label>Recently heard nodes (latest SNR)</label>
+    <div id="recent" class="recent"><div class="muted">— nothing yet —</div></div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnDbg" class="btn2">Show debug log</button>
+      <button id="btnClear" class="btn2">Clear log</button>
+    </div>
+    <pre id="log" style="display:none"></pre>
   </div>
   <script type="module" src="/src/app.js"></script>
 </body>

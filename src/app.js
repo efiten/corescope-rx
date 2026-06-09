@@ -12,7 +12,42 @@ import { Queue } from './queue.js';
 import { Publisher } from './publisher.js';
 
 const els = (id) => document.getElementById(id);
-const state = { transport: null, gps: new Gps(), queue: new Queue(), publisher: null, heard: 0, companionPubkey: '', connected: false };
+const state = { transport: null, gps: new Gps(), queue: new Queue(), publisher: null, heard: 0, companionPubkey: '', connected: false, recent: [] };
+
+const RECENT_MAX = 20;
+
+// SNR → colour bucket (LoRa-ish). Returns a CSS colour.
+function snrColor(snr) {
+  if (snr == null) return '#95a5a6';
+  if (snr >= 5) return '#2ecc71';
+  if (snr >= -3) return '#f1c40f';
+  if (snr >= -10) return '#e67e22';
+  return '#e74c3c';
+}
+
+// noteHeard upserts a heard node into the recent list (most-recent first).
+function noteHeard(key, keylen, snr, rssi, src) {
+  let e = state.recent.find((x) => x.key === key);
+  if (e) state.recent = state.recent.filter((x) => x !== e);
+  else e = { key, keylen, count: 0, src };
+  e.count++; e.snr = snr; e.rssi = rssi; e.last = Date.now();
+  state.recent.unshift(e);
+  state.recent = state.recent.slice(0, RECENT_MAX);
+  renderRecent();
+}
+
+function renderRecent() {
+  const el = els('recent');
+  if (!state.recent.length) { el.innerHTML = '<div class="muted">— nothing yet —</div>'; return; }
+  el.innerHTML = state.recent.map((e) => {
+    const snr = e.snr != null ? e.snr.toFixed(1) + ' dB' : 'no sig';
+    return '<div class="rr">' +
+      '<span class="dot" style="background:' + snrColor(e.snr) + '"></span>' +
+      '<span class="rk">' + e.key + '</span>' +
+      '<span class="rsnr" style="color:' + snrColor(e.snr) + '">' + snr + '</span>' +
+      '<span class="rc">×' + e.count + '</span></div>';
+  }).join('');
+}
 
 // MQTT config from build-time env (Vite); never the UI. Treat as a shared,
 // publish-only ingest account (EMQX ACL); not a real secret.
@@ -65,6 +100,7 @@ async function processFrame(dv) {
   const hk = deriveHeardKey('rx', pkt);
   if (!hk) { dbg('  → not attributable (tx / 1-byte hop / no advert) — skip'); return; }
   dbg('  → heard ' + hk.heardKey + ' (' + hk.heardKeyLen + 'B, ' + hk.src + ')');
+  noteHeard(hk.heardKey, hk.heardKeyLen, f.snr, f.rssi, hk.src); // show in the list even without a GPS fix
   const fix = currentFix();
   if (!fix) { dbg('  → no GPS fix — skip'); return; }
   const rec = { rx_at: new Date().toISOString(), raw: rawHex, snr: f.snr, rssi: f.rssi, lat: fix.lat, lon: fix.lon, acc_m: fix.acc_m };
@@ -152,6 +188,13 @@ window.addEventListener('DOMContentLoaded', () => {
   setButton();
   els('btnConnect').addEventListener('click', () => (state.connected ? disconnectAll() : connectAll()));
   els('btnClear').addEventListener('click', () => { els('log').textContent = ''; });
+  els('btnDbg').addEventListener('click', () => {
+    const log = els('log');
+    const show = log.style.display === 'none';
+    log.style.display = show ? 'block' : 'none';
+    els('btnDbg').textContent = show ? 'Hide debug log' : 'Show debug log';
+  });
+  renderRecent();
   refreshCounters();
   drainLoop();
   if ('serviceWorker' in navigator) {
