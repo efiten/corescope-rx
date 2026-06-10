@@ -28,17 +28,20 @@ export function createLocalMap(containerId) {
   // Stop following when the user drags the map (so they can inspect the trail);
   // the 📍 button re-enables follow.
   map.on('dragstart', () => { follow = false; });
+  // Use Leaflet's own control markup (leaflet-bar + <a>) so it looks exactly like
+  // the zoom buttons and isn't hit by the app's global `button {}` styles.
   const FollowCtl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd() {
-      const b = L.DomUtil.create('button', '');
-      b.innerHTML = '📍';
-      b.title = 'Follow GPS';
-      // Explicit padding/margin/box-sizing to override the app's global button CSS,
-      // which otherwise shoves the icon outside the box.
-      b.style.cssText = 'width:34px;height:34px;padding:0;margin:0;box-sizing:border-box;font-size:17px;line-height:34px;text-align:center;cursor:pointer;background:#fff;color:#000;border:2px solid rgba(0,0,0,.2);border-radius:4px';
-      L.DomEvent.on(b, 'click', (e) => { L.DomEvent.stop(e); follow = true; if (me) map.panTo(me.getLatLng()); });
-      return b;
+      const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const a = L.DomUtil.create('a', '', c);
+      a.href = '#';
+      a.title = 'Follow GPS';
+      a.setAttribute('role', 'button');
+      a.innerHTML = '📍';
+      a.style.cssText = 'font-size:18px;line-height:30px;text-align:center';
+      L.DomEvent.on(a, 'click', (e) => { L.DomEvent.stop(e); follow = true; if (me) map.panTo(me.getLatLng()); });
+      return c;
     },
   });
   map.addControl(new FollowCtl());
