@@ -34,7 +34,9 @@ export function createLocalMap(containerId) {
       const b = L.DomUtil.create('button', '');
       b.innerHTML = '📍';
       b.title = 'Follow GPS';
-      b.style.cssText = 'width:34px;height:34px;font-size:17px;line-height:34px;cursor:pointer;background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:4px';
+      // Explicit padding/margin/box-sizing to override the app's global button CSS,
+      // which otherwise shoves the icon outside the box.
+      b.style.cssText = 'width:34px;height:34px;padding:0;margin:0;box-sizing:border-box;font-size:17px;line-height:34px;text-align:center;cursor:pointer;background:#fff;color:#000;border:2px solid rgba(0,0,0,.2);border-radius:4px';
       L.DomEvent.on(b, 'click', (e) => { L.DomEvent.stop(e); follow = true; if (me) map.panTo(me.getLatLng()); });
       return b;
     },
