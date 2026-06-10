@@ -14,7 +14,7 @@ import { Queue } from './queue.js';
 import { Publisher } from './publisher.js';
 
 const els = (id) => document.getElementById(id);
-const state = { transport: null, gps: new Gps(), queue: new Queue(), publisher: null, heard: 0, companionPubkey: '', connected: false, recent: [], localMap: null };
+const state = { transport: null, gps: new Gps(), queue: new Queue(), publisher: null, heard: 0, companionPubkey: '', companionName: '', connected: false, recent: [], localMap: null };
 
 const RECENT_MAX = 20;
 
@@ -138,7 +138,7 @@ async function drainLoop() {
     try {
       const rows = await state.queue.takeAll();
       const done = [];
-      for (const r of rows) { await state.publisher.publish(state.companionPubkey, r); done.push(r.id); }
+      for (const r of rows) { await state.publisher.publish(state.companionPubkey, r, state.companionName); done.push(r.id); }
       if (done.length) { await state.queue.remove(done); dbg('published ' + done.length + ' record(s)'); }
     } catch (e) { dbg('publish error (kept buffered): ' + e.message); }
     refreshCounters();
@@ -166,6 +166,7 @@ async function connectAll() {
     const s2 = step('② Reading companion ID…', 'pending');
     const info = await requestSelfInfo(state.transport);
     state.companionPubkey = info.pubkey.toLowerCase();
+    state.companionName = info.name || ''; // sent as "origin" so the server can name this observer
     s2.textContent = '② Companion: ' + (info.name || '(unnamed)') + ' ✓';
     s2.className = '';
     els('companionInfo').textContent = state.companionPubkey.slice(0, 20) + '…';

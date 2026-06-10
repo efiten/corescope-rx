@@ -26,9 +26,12 @@ export class Publisher {
   end() { try { if (this.client) this.client.end(true); } catch (e) {} this.client = null; }
 
   // buildPayload assembles one reception in the ingestor's expected shape.
-  static buildPayload(rxPubkey, rec) {
+  // `name` is the companion's self-reported name (SELF_INFO) → sent as "origin"
+  // so the server can label this observer even if it never advertised.
+  static buildPayload(rxPubkey, rec, name) {
     return {
       origin_id: rxPubkey,
+      origin: name || undefined,
       timestamp: rec.rx_at,
       type: 'PACKET',
       direction: 'rx',
@@ -40,9 +43,9 @@ export class Publisher {
   }
 
   // publish sends one reception; resolves on broker ack (QoS1).
-  publish(rxPubkey, rec) {
+  publish(rxPubkey, rec, name) {
     const topic = 'meshcore/client/' + rxPubkey + '/packets';
-    const payload = JSON.stringify(Publisher.buildPayload(rxPubkey, rec));
+    const payload = JSON.stringify(Publisher.buildPayload(rxPubkey, rec, name));
     return new Promise((resolve, reject) => {
       this.client.publish(topic, payload, { qos: 1 }, (err) => (err ? reject(err) : resolve()));
     });
