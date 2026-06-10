@@ -34,6 +34,7 @@ export function createLocalMap(containerId) {
     options: { position: 'topleft' },
     onAdd() {
       const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      c.style.margin = '10px 0 0 10px'; // align under the zoom control (corner margin)
       const a = L.DomUtil.create('a', '', c);
       a.href = '#';
       a.title = 'Follow GPS';
