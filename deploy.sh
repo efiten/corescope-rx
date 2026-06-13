@@ -20,7 +20,12 @@ SSH_OPTS=(-o StrictHostKeyChecking=accept-new)
 echo "[rx] building..."
 npm run build
 
-echo "[rx] uploading dist/ -> $HOST:$DEST (config.json left untouched) ..."
+# Never ship a config.json: the sysop owns it on the server (next to index.html).
+# A local public/config.json (used for `npm run dev`) is copied into dist/ by Vite,
+# so drop it here to avoid overwriting the server's real config on upload.
+rm -f dist/config.json
+
+echo "[rx] uploading dist/ -> $HOST:$DEST (server config.json left untouched) ..."
 scp "${SSH_OPTS[@]}" -r dist/. "$HOST:$DEST"
 
 echo "[rx] done."
