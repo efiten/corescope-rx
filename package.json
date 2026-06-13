@@ -1,9 +1,16 @@
 {
   "name": "corescope-rx",
   "version": "0.8.1",
-  "private": true,
+  "private": false,
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "description": "Mobile RX coverage capture for CoreScope: BLE companion → MQTT (GPS + SNR/RSSI + multibyte)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/efiten/corescope-rx.git"
+  },
+  "homepage": "https://github.com/efiten/corescope-rx#readme",
+  "bugs": "https://github.com/efiten/corescope-rx/issues",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
