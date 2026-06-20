@@ -7,11 +7,12 @@ export class Publisher {
   // opts: { url, username, password } — EMQX WSS endpoint + per-client creds.
   constructor(opts) { this.opts = opts; this.client = null; this._onStatus = null; }
 
-  // onStatus(cb): cb(state) is called on connection lifecycle changes, where state is
-  // 'connect' | 'reconnect' | 'offline' | 'close'. Drives the Home upload indicator and
-  // a drain kick on reconnect. A network handoff (cellular→WiFi) silently kills the
-  // socket; a short keepalive makes MQTT.js notice and reconnect quickly.
+  // onStatus(cb): cb(state, arg) is called on connection lifecycle changes, where state
+  // is 'connect' | 'reconnect' | 'offline' | 'close' | 'error' (arg = Error for 'error').
+  // Drives the Home upload indicator, the debug log, and a drain kick on reconnect.
   onStatus(cb) { this._onStatus = cb; }
+
+  _emit(ev, arg) { if (this._onStatus) this._onStatus(ev, arg); }
 
   connect() {
     this.client = mqtt.connect(this.opts.url, {
@@ -19,19 +20,32 @@ export class Publisher {
       password: this.opts.password,
       clientId: this.opts.clientId, // = companion pubkey; EMQX ACL can bind topics to ${clientid}
       reconnectPeriod: 4000,
-      keepalive: 20, // detect a dead socket fast (default 60 s is too slow after a handoff)
       clean: true,
     });
     for (const ev of ['connect', 'reconnect', 'offline', 'close']) {
-      this.client.on(ev, () => { if (this._onStatus) this._onStatus(ev); });
+      this.client.on(ev, () => this._emit(ev));
     }
+    // PERSISTENT error listener. mqtt.js is an EventEmitter: an 'error' with no listener
+    // throws and can wedge the auto-reconnect loop — which left the client permanently
+    // disconnected (every reception stuck pending) after one transient drop. Always
+    // listen and surface the reason instead.
+    this.client.on('error', (e) => this._emit('error', e));
+    // Resolve/reject the INITIAL connect only. Listeners are removed once settled so the
+    // persistent 'error' handler above is the sole long-lived one afterwards.
     return new Promise((resolve, reject) => {
-      this.client.once('connect', resolve);
-      this.client.once('error', reject);
+      const onConn = () => { cleanup(); resolve(); };
+      const onErr = (e) => { cleanup(); reject(e); };
+      const cleanup = () => { this.client.removeListener('connect', onConn); this.client.removeListener('error', onErr); };
+      this.client.on('connect', onConn);
+      this.client.on('error', onErr);
     });
   }
 
   connected() { return !!(this.client && this.client.connected); }
+
+  // reconnect forces a fresh connection attempt — used by "Push pending now" when the
+  // client is disconnected, so the user isn't stuck with a dead link and a full queue.
+  reconnect() { try { if (this.client) this.client.reconnect(); } catch (e) {} }
 
   end() { try { if (this.client) this.client.end(true); } catch (e) {} this.client = null; }
 

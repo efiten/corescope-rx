@@ -203,7 +203,10 @@ async function renderStatusStrip() {
   els('sPending').textContent = (await state.queue.count()) + ' pending';
   els('sRate').textContent = state.rxTimes.length + ' pkt/min';
   const dot = els('uDot');
-  const color = state.brokerState === 'connect' ? '#2ecc71' : state.brokerState === 'reconnect' ? '#e6a23c' : '#9aa4b2';
+  const color = !state.publisher ? '#9aa4b2'
+    : state.brokerState === 'connect' ? '#2ecc71'
+    : state.brokerState === 'reconnect' ? '#e6a23c'
+    : '#e74c3c'; // offline / close / error → red so a dead link is obvious, not idle-grey
   dot.style.background = color;
   els('sUpload').lastChild.textContent = state.lastUploadAt ? 'upload ' + agoText(state.lastUploadAt, now) : 'upload —';
 }
@@ -233,8 +236,22 @@ function noteSnr(snr) {
 
 // --- Settings renderers ---
 function renderBroker() {
-  const m = { connect: 'connected', reconnect: 'reconnecting…', offline: 'offline', close: 'disconnected' };
+  const m = { connect: 'connected', reconnect: 'reconnecting…', offline: 'offline', close: 'disconnected', error: 'error' };
   els('brokerStatus').textContent = state.publisher ? (m[state.brokerState] || state.brokerState) : '— not connected —';
+}
+
+// onBrokerStatus logs every MQTT lifecycle change to the debug log (previously invisible,
+// so a field disconnect couldn't be diagnosed) and flushes the backlog on (re)connect.
+function onBrokerStatus(s, arg) {
+  state.brokerState = s;
+  if (s === 'connect') dbg('CoreScope connected', 'ok');
+  else if (s === 'reconnect') dbg('CoreScope reconnecting…', 'st');
+  else if (s === 'offline') dbg('CoreScope offline (no network?)', 'no');
+  else if (s === 'close') dbg('CoreScope connection closed', 'no');
+  else if (s === 'error') dbg('CoreScope error: ' + ((arg && arg.message) || arg), 'no');
+  renderBroker();
+  renderStatusStrip();
+  if (s === 'connect') drain().then(refreshCounters).catch(() => {}); // flush backlog on (re)connect
 }
 
 function setButton() {
@@ -339,11 +356,17 @@ async function drainLoop() {
   }
 }
 
-// pushNow is the Settings button: force one drain attempt and report the outcome.
+// pushNow is the Settings button: force a drain, or force a reconnect first if the link
+// is down — so a stuck disconnected client with a full queue has a manual way to recover.
 async function pushNow() {
   const b = els('btnPush');
   b.disabled = true;
   try {
+    if (state.publisher && !state.publisher.connected()) {
+      dbg('CoreScope not connected — forcing reconnect…', 'st');
+      state.publisher.reconnect(); // drain fires automatically on the 'connect' event
+      return;
+    }
     const n = await drain();
     dbg(n ? 'pushed ' + n + ' record(s)' : 'nothing pending / not connected', n ? 'ok' : 'st');
   } catch (e) {
@@ -405,12 +428,7 @@ async function connectAll() {
     const cfg = getConfig();
     if (cfg && cfg.mqttUrl) {
       state.publisher = new Publisher({ url: cfg.mqttUrl, username: cfg.mqttUsername, password: cfg.mqttPassword, clientId: state.companionPubkey });
-      state.publisher.onStatus((s) => {
-        state.brokerState = s;
-        renderBroker();
-        renderStatusStrip();
-        if (s === 'connect') drain().then(refreshCounters).catch(() => {}); // flush backlog on (re)connect
-      });
+      state.publisher.onStatus(onBrokerStatus);
       await state.publisher.connect();
       state.brokerState = 'connect';
       renderBroker();
