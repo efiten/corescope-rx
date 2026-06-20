@@ -25,3 +25,25 @@ test('publish rejects on a broker error', async () => {
   p.client = { publish(_t, _pl, _o, cb) { cb(new Error('nope')); } };
   await assert.rejects(p.publish('pk', rec, 'name', 1000), /nope/);
 });
+
+test('reconnect() asks the client to reconnect (manual recovery)', () => {
+  const p = new Publisher({ url: 'x' });
+  let called = false;
+  p.client = { reconnect() { called = true; } };
+  p.reconnect();
+  assert.strictEqual(called, true);
+});
+
+test('reconnect() is a no-op when there is no client', () => {
+  const p = new Publisher({ url: 'x' });
+  assert.doesNotThrow(() => p.reconnect());
+});
+
+test('onStatus receives the event and its arg (e.g. error reason)', () => {
+  const p = new Publisher({ url: 'x' });
+  const seen = [];
+  p.onStatus((ev, arg) => seen.push([ev, arg && arg.message]));
+  p._emit('reconnect');
+  p._emit('error', new Error('boom'));
+  assert.deepStrictEqual(seen, [['reconnect', undefined], ['error', 'boom']]);
+});
